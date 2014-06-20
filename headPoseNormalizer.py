@@ -74,7 +74,8 @@ def detectEyes(faces):
   for face in faces:
     classifier = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(face.crop,1.1,2)
 
-    print '%s eye(s) found.' %len(classifier)
+    if len(classifier) != 2:
+      raise Exception('Number of eyes found != 2')
 
     for x,y,w,h in classifier:
       cx = x + w / 2
@@ -91,7 +92,8 @@ def detectFaces(imageObjectGray):
   
   classifier = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray,1.3,5)
 
-  print '%s face(s) found.' %len(classifier)
+  if len(classifier) < 1:
+    raise Exception('Number of faces found < 1.')
 
   for x,y,w,h in classifier:
     face = Face(x,y,w,h)
@@ -106,7 +108,8 @@ def detectNoses(faces):
   for face in faces:
     classifier = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(face.crop,1.3,5)
 
-    print '%s nose(s) found.' %len(classifier)
+    if len(classifier) != 1:
+      raise Exception('Number of noses found != 1.')
 
     for x,y,w,h in classifier:
       nose = Nose(x,y,w,h)
@@ -123,9 +126,8 @@ def main():
   imageObject = cv2.imread(imageSource)
   imageObjectGray = convertGray(imageObject)
   faces = detectFaces(imageObjectGray)
-  if len(faces) != 0:
-    cropFaces(faces,imageObjectGray)
-    detectEyes(faces)
-    detectNoses(faces)
+  cropFaces(faces,imageObjectGray)
+  detectEyes(faces)
+  detectNoses(faces)
 
 main()
