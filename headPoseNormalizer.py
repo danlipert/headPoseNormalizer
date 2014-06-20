@@ -5,6 +5,7 @@ from PIL import Image
 
 cascadeEyePath = '/usr/share/opencv/haarcascades/haarcascade_eye.xml'
 cascadeFacePath = '/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml'
+cascadeNosePath = '/usr/share/opencv/haarcascades/haarcascade_mcs_nose.xml'
 imageSource = 'sample_images/one_person.jpg'
 
 class Feature:
@@ -18,12 +19,13 @@ class Face(Feature):
   """
   """
 
-  def __init__(self,x,y,w,h,eyes=[],crop=None):
+  def __init__(self,x,y,w,h,eyes=[],nose=None,crop=None):
     self.x = int(x)
     self.y = int(y)
     self.w = int(w)
     self.h = int(h)
     self.eyes = eyes
+    self.nose = nose
     self.crop = crop
 
 class Eye(Feature):
@@ -38,13 +40,24 @@ class Eye(Feature):
     self.cx = int(cx)
     self.cy = int(cy)
 
+class Nose(Feature):
+  """
+  """
+
+  def __init__(self,x,y,w,h):
+    self.x = int(x)
+    self.y = int(y)
+    self.w = int(w)
+    self.h = int(h)
+
 def cropFaces(faces,imageObjectGray):
   """
   Loads grayscale image and face data and appends cropped face to faces. This is an in-place function.
   """
 
   for face in faces:
-    face.crop = (imageObjectGray[face.x:face.x+face.w,face.y:face.y+face.h])
+    face.crop = (imageObjectGray[face.y:face.y+face.h,face.x:face.x+face.w])
+    cv2.imwrite('test.jpg',face.crop)
 
 def convertGray(imageObject):
   """
@@ -59,9 +72,11 @@ def detectEyes(faces):
   """
   
   for face in faces:
-    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(face.crop,1.1,3)
+    classifier = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(face.crop,1.1,2)
 
-    for x,y,w,h in eyes:
+    print '%s eye(s) found.' %len(classifier)
+
+    for x,y,w,h in classifier:
       cx = x + w / 2
       cy = y + h / 2
       eye = Eye(x,y,w,h,cx,cy)
@@ -76,11 +91,26 @@ def detectFaces(imageObjectGray):
   
   classifier = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray,1.3,5)
 
+  print '%s face(s) found.' %len(classifier)
+
   for x,y,w,h in classifier:
     face = Face(x,y,w,h)
     faces.append(face)
 
   return faces
+
+def detectNoses(faces):
+  """
+  """
+
+  for face in faces:
+    classifier = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(face.crop,1.3,5)
+
+    print '%s nose(s) found.' %len(classifier)
+
+    for x,y,w,h in classifier:
+      nose = Nose(x,y,w,h)
+      face.nose = nose
 
 def normalizeHeadGeometry(faceObjectGray):
   """
@@ -96,8 +126,6 @@ def main():
   if len(faces) != 0:
     cropFaces(faces,imageObjectGray)
     detectEyes(faces)
-    for face in faces:
-      for eye in face.eyes:
-        print eye.to_JSON()
+    detectNoses(faces)
 
 main()
