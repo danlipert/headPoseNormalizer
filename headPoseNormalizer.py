@@ -11,12 +11,13 @@ class Face:
   """
   """
 
-  def __init__(self,x,y,w,h,eyes=[]):
+  def __init__(self,x,y,w,h,eyes=[],image=[]):
     self.x = int(x)
     self.y = int(y)
     self.w = int(w)
     self.h = int(h)
     self.eyes = eyes
+    self.image = image
 
 class Eye:
   """
@@ -44,11 +45,10 @@ def cropFaces(faces,imageObjectGray):
 
   returnData = []
 
-  sourceImage = ImageObjectGray
-
-  for face in faces
+  for face in faces:
     box = (face.x, face.y + face.h, face.x + face.w, face.y)
-    face.image.append(sourceImage.crop(box))
+    print str(imageObjectGray)
+    face.image.append(imageObjectGray.crop(box))
 
   return returnData
 
@@ -89,7 +89,7 @@ def detectFaces(imageObjectGray):
 
   for x,y,w,h in classifier:
     face = Face(x,y,w,h)
-    faces.append(face)
+    returnData.append(face)
 
   return returnData
 
@@ -104,7 +104,7 @@ def main():
   imageObject = cv2.imread(imageSource)
   imageObjectGray = convertGray(imageObject)
   faces = detectFaces(imageObjectGray)
-  crops = cropFaces(faces)
+  crops = cropFaces(faces,imageObjectGray)
   eyes = detectEyes(crops)
   
   test = Object()
