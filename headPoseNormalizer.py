@@ -7,19 +7,26 @@ cascadeEyePath = '/usr/share/opencv/haarcascades/haarcascade_eye.xml'
 cascadeFacePath = '/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml'
 imageSource = 'sample_images/one_person.jpg'
 
-class Face:
+class Feature:
   """
   """
 
-  def __init__(self,x,y,w,h,eyes=[],image=[]):
+  def to_JSON(self):
+    return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=2)
+
+class Face(Feature):
+  """
+  """
+
+  def __init__(self,x,y,w,h,eyes=[],crop=None):
     self.x = int(x)
     self.y = int(y)
     self.w = int(w)
     self.h = int(h)
     self.eyes = eyes
-    self.image = image
+    self.crop = crop
 
-class Eye:
+class Eye(Feature):
   """
   """
 
@@ -31,28 +38,13 @@ class Eye:
     self.cx = int(cx)
     self.cy = int(cy)
 
-class Object:
-  """
-  """
-
-  def to_JSON(self):
-    return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=2)
-
 def cropFaces(faces,imageObjectGray):
   """
-  Loads grayscale image and face data and returns cropped images.
+  Loads grayscale image and face data and appends cropped face to faces. This is an in-place function.
   """
 
-  returnData = []
-
   for face in faces:
-    box = (face.x, face.y + face.h, face.x + face.w, face.y)
-    print str(imageObjectGray)
-    face.image.append(imageObjectGray.crop(box))
-
-  return returnData
-
-  print 'cropFaces'
+    face.crop = (imageObjectGray[face.x:face.x+face.w,face.y:face.y+face.h])
 
 def convertGray(imageObject):
   """
@@ -63,35 +55,32 @@ def convertGray(imageObject):
 
 def detectEyes(faces):
   """
+  Loads array of faces, detects eyes within them, and returns their positions. This is an in-place function.
   """
   
-  returnData = []
-  
   for face in faces:
-    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(face.image,1.1,3)
+    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(face.crop,1.1,3)
 
     for x,y,w,h in eyes:
       cx = x + w / 2
       cy = y + h / 2
       eye = Eye(x,y,w,h,cx,cy)
       face.eyes.append(eye)
-  
-  return returnData
 
 def detectFaces(imageObjectGray):
   """
-  Loads grayscale image, detects faces, and returns their positions.
+  Loads grayscale image, detects faces, and returns an array of face objects.
   """
   
-  returnData = []
+  faces = []
   
   classifier = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray,1.3,5)
 
   for x,y,w,h in classifier:
     face = Face(x,y,w,h)
-    returnData.append(face)
+    faces.append(face)
 
-  return returnData
+  return faces
 
 def normalizeHeadGeometry(faceObjectGray):
   """
@@ -104,12 +93,11 @@ def main():
   imageObject = cv2.imread(imageSource)
   imageObjectGray = convertGray(imageObject)
   faces = detectFaces(imageObjectGray)
-  crops = cropFaces(faces,imageObjectGray)
-  eyes = detectEyes(crops)
-  
-  test = Object()
-  test.data = eyes
-
-  print test.to_JSON()
+  if len(faces) != 0:
+    cropFaces(faces,imageObjectGray)
+    detectEyes(faces)
+    for face in faces:
+      for eye in face.eyes:
+        print eye.to_JSON()
 
 main()
