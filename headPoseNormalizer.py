@@ -2,14 +2,29 @@ import cv2
 import json
 import numpy
 
-imageSource = 'sample_images/one_person.jpg'
+imageSource = './photos/Dan_Lipert_8.JPG'
 
-cascadeEyePath = '/usr/share/opencv/haarcascades/haarcascade_eye.xml'
+cascadeEyePath = './data/haarcascade_eye.xml'
 
-cascadeFacePath = '/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml'
+cascadeFacePath = './data/haarcascade_frontalface_default.xml'
+
+DEFAULT_EYE_HAAR_SCALE = 1.1
+DEFAULT_EYE_HAAR_NEIGHBORS = 3
+DEFAULT_FACE_HAAR_SCALE = 1.3
+DEFAULT_FACE_HAAR_NEIGHBORS = 5
+
+MINIMUM_FACE_HAAR_NEIGHBORS = 2
+
+MINIMUM_FACE_WIDTH = 200
+MINIMUM_FACE_HEIGHT = 200
 
 class Face:
   """
+  Class representing human face
+  x,y - origin
+  w - width
+  h - height
+  eyes - two eyes
   """
 
   def __init__(self,x,y,w,h,eyes=[]):
@@ -21,6 +36,10 @@ class Face:
 
 class Eye:
   """
+  Class representing eye
+  x,y - origin
+  w - width
+  h - height
   """
 
   def __init__(self,x,y,w,h):
@@ -47,19 +66,72 @@ def detectFeatures(imageObjectGray):
 
   features = []
 
-  faces = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray,1.3,5)
+  FACE_HAAR_NEIGHBORS = DEFAULT_FACE_HAAR_NEIGHBORS
+  FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
+  faces = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray, FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
+
+  while len(faces) != 1:
+    print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
+    faces = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray, FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS, 0, (MINIMUM_FACE_WIDTH, MINIMUM_FACE_HEIGHT))
+    if len(faces) < 1:
+        print 'Need more faces!'
+        FACE_HAAR_SCALE = FACE_HAAR_SCALE * 0.99
+        if FACE_HAAR_SCALE < DEFAULT_FACE_HAAR_SCALE * 0.9:
+            FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS - 1
+            FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
+        if FACE_HAAR_NEIGHBORS < MINIMUM_FACE_HAAR_NEIGHBORS:
+            print 'COULDNT FIND A FACE!'
+            break
+    elif len(faces) > 1:
+        print 'Too many faces!'
+        FACE_HAAR_SCALE = FACE_HAAR_SCALE * 1.01
+        if FACE_HAAR_SCALE > DEFAULT_FACE_HAAR_SCALE * 1.05:
+            FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS + 1
+            FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
+        else:
+            print 'COULDNT FIND LESS THAN TWO FACES!'
+            break
 
   for x,y,w,h in faces:
 
     face = Face(x,y,w,h)
 
-    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(imageObjectGray[y:y+h,x:x+w],1.1,3)
+    #scan top half of face bounds
+    #there better be two eyes, if not make less sensitive and try smaller scale
+    EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
+    EYE_HAAR_NEIGHBORS = DEFAULT_EYE_HAAR_NEIGHBORS
 
-    print len(eyes)
+    eye_candidate_region = imageObjectGray[y:y+(h/2),x:x+w]
+    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
 
-    for x,y,w,h in eyes:
+    while len(eyes) != 2:
+        print '%s eyes detected S:%s N:%s' % (len(eyes), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        if len(eyes) < 2:
+            eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+            EYE_HAAR_SCALE = EYE_HAAR_SCALE * 0.99
+            if EYE_HAAR_SCALE < 1.04:
+                EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
+                EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS - 1
+            if EYE_HAAR_NEIGHBORS == 0:
+                print 'COULDNT FIND 2 EYES!'
+                break
+        if len(eyes) > 2:
+            eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+            EYE_HAAR_SCALE = EYE_HAAR_SCALE * 1.01
+            if EYE_HAAR_SCALE > 1.2:
+                EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
+                EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS + 1
+            if EYE_HAAR_NEIGHBORS >= DEFAULT_EYE_HAAR_NEIGHBORS + 2:
+                print 'COULDNT FIND less than 3 eyes?!'
+                break
 
-      eye = Eye(x,y,w,h)
+    print '%s eyes detected S:%s N:%s' % (len(eyes), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+
+    for e_x, e_y, e_w, e_h in eyes:
+      #correct coordinate system
+      e_x = x + e_x
+      e_y = y + e_y 
+      eye = Eye(e_x, e_y, e_w, e_h)
 
       face.eyes.append(eye)
 
@@ -81,9 +153,22 @@ def normalizeHeadGeometry(faceObjectGray):
 
   print 'normalizeHeadGeometry'
 
-def main():
+def draw_results(image, dataObject):
+    cv2.namedWindow('Image')
+    cv2.moveWindow('Image', 0, 100)
+    face = dataObject.data[0]
+    cv2.rectangle(image, (face.x, face.y), (face.x+face.w, face.y+face.h), (255,0,0))
+    for eye in face.eyes:
+        cv2.rectangle(image, (eye.x, eye.y), (eye.x+eye.w, eye.y+eye.h), (0,255,0))
+    cv2.imshow('Image', image)
+    while cv2.waitKey(25) != 27:
+       continue
 
-  imageObjectGray = convertGray(cv2.imread(imageSource))
+def main():
+  try:
+    imageObjectGray = convertGray(cv2.imread(imageSource))
+  except Exception as e:
+    print "Couldn't load %s" % imageSource
 
   features = detectFeatures(imageObjectGray)
   
@@ -92,5 +177,7 @@ def main():
   test.data = features
 
   print test.to_JSON()
+  
+  draw_results(cv2.imread(imageSource), test)
 
 main()
