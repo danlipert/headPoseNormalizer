@@ -25,6 +25,10 @@ MINIMUM_FACE_HEIGHT = 200
 
 DIALATION_PERCENTAGE = 1.25
 
+EYE_REGION = 1.0/2.0  # fraction of a face width to check for r and l eyes
+
+FILTER_FACES = True
+
 
 #left eye, right eye, nose
 LEFT_EYE = [0.0, 0.0, 0.0]
@@ -217,6 +221,8 @@ def detectFeatures(imageObjectGray):
     MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * face.w)
     MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * face.h)
     eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+face.w]
+    r_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x+face.w-(face.w*EYE_REGION):face.x+face.w]
+    l_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+(face.w*EYE_REGION)]
     nose_candidate_region = imageObjectGray[face.y:face.y+face.h, face.x:face.x+face.w]
     mouth_candidate_region = imageObjectGray[face.y+face.h/3*2:face.y+face.h, face.x:face.x+face.w]
     y_m = face.y+face.h/3*2
@@ -224,31 +230,60 @@ def detectFeatures(imageObjectGray):
     cv2.moveWindow('face-upper-half', 0, 50)
     cv2.imshow('face-upper-half', eye_candidate_region)
     cv2.waitKey(25)
-    eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
 
-    while len(eyes) != 2:
-        print '%s eyes detected S:%s N:%s' % (len(eyes), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
-        if len(eyes) < 2:
-            eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
+    l_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(l_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
+
+    while len(l_eye) != 1:
+        print '%s eyes detected S:%s N:%s' % (len(l_eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        if len(l_eye) < 1:
+            l_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(l_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
             EYE_HAAR_SCALE = EYE_HAAR_SCALE * 0.99
             if EYE_HAAR_SCALE < 1.04:
                 EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
                 EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS - 1
             if EYE_HAAR_NEIGHBORS == 0:
-                print 'COULDNT FIND 2 EYES!'
+                print 'COULDNT FIND LEFT EYE!'
                 break
-        if len(eyes) > 2:
-            eyes = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        if len(l_eye) > 1:
+            l_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(l_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
             EYE_HAAR_SCALE = EYE_HAAR_SCALE * 1.01
             if EYE_HAAR_SCALE > 1.2:
                 EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
                 EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS + 1
             if EYE_HAAR_NEIGHBORS >= DEFAULT_EYE_HAAR_NEIGHBORS + 2:
-                print 'COULDNT FIND less than 3 eyes?!'
+                print 'COULDNT FIND less than 2 left eyes?!'
                 break
 
-    if len(eyes) != 2:
-        continue
+    r_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(r_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
+
+    while len(r_eye) != 1:
+        print '%s eyes detected S:%s N:%s' % (len(r_eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        if len(r_eye) < 1:
+            r_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(r_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS, 0, (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT), (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
+            EYE_HAAR_SCALE = EYE_HAAR_SCALE * 0.99
+            if EYE_HAAR_SCALE < 1.04:
+                EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
+                EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS - 1
+            if EYE_HAAR_NEIGHBORS == 0:
+                print 'COULDNT FIND RIGHT EYE!'
+                break
+        if len(r_eye) > 1:
+            r_eye = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale(r_eye_candidate_region, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+            EYE_HAAR_SCALE = EYE_HAAR_SCALE * 1.01
+            if EYE_HAAR_SCALE > 1.2:
+                EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
+                EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS + 1
+            if EYE_HAAR_NEIGHBORS >= DEFAULT_EYE_HAAR_NEIGHBORS + 2:
+                print 'COULDNT FIND less than 2 right eyes?!'
+                break
+
+    if FILTER_FACES:
+        if len(l_eye) == 0 or len(r_eye) == 0:
+            continue
+
+    eyes = [l_eye.ravel(), r_eye.ravel()]
+    print eyes
+    print len(eyes)
 
     print '%s eyes detected S:%s N:%s' % (len(eyes), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
     new_eyes = []
