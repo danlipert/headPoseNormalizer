@@ -212,10 +212,10 @@ def detectFeatures(imageObjectGray):
     MINIMUM_EYE_HEIGHT_RATIO = 0.01
     MAXIMUM_EYE_WIDTH_RATIO = 0.5
     MAXIMUM_EYE_HEIGHT_RATIO = 0.5
-    MINIMUM_EYE_WIDTH = int(MINIMUM_EYE_WIDTH_RATIO * w)
-    MINIMUM_EYE_HEIGHT = int(MINIMUM_EYE_HEIGHT_RATIO * h)
-    MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * w)
-    MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * h)
+    MINIMUM_EYE_WIDTH = int(MINIMUM_EYE_WIDTH_RATIO * face.w)
+    MINIMUM_EYE_HEIGHT = int(MINIMUM_EYE_HEIGHT_RATIO * face.h)
+    MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * face.w)
+    MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * face.h)
     eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+face.w]
     nose_candidate_region = imageObjectGray[face.y:face.y+face.h, face.x:face.x+face.w]
     mouth_candidate_region = imageObjectGray[face.y+face.h/3*2:face.y+face.h, face.x:face.x+face.w]
