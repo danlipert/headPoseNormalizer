@@ -15,13 +15,15 @@ cascadeMouthPath = './data/haarcascade_mcs_mouth.xml'
 
 DEFAULT_EYE_HAAR_SCALE = 1.1
 DEFAULT_EYE_HAAR_NEIGHBORS = 3
-DEFAULT_FACE_HAAR_SCALE = 1.3
-DEFAULT_FACE_HAAR_NEIGHBORS = 5
+DEFAULT_FACE_HAAR_SCALE = 1.01
+DEFAULT_FACE_HAAR_NEIGHBORS = 3
 
 MINIMUM_FACE_HAAR_NEIGHBORS = 2
 
 MINIMUM_FACE_WIDTH = 200
 MINIMUM_FACE_HEIGHT = 200
+
+DIALATION_PERCENTAGE = 1.25
 
 
 #left eye, right eye, nose
@@ -38,10 +40,10 @@ class FaceFeature:
     self.y = int(y)
     self.w = int(w)
     self.h = int(h)
-  
+
   def center(self):
     return [int(self.x+self.w/2), int(self.y+self.h/2)]
-    
+
 class Face:
   """
   Class representing human face
@@ -52,21 +54,25 @@ class Face:
   """
 
   def __init__(self,x,y,w,h,eyes=[], nose=None, mouth=None):
-    self.x = int(x)
-    self.y = int(y)
-    self.w = int(w)
-    self.h = int(h)
+
+    w_dialation_shift = (w * DIALATION_PERCENTAGE - w) / 2.0
+    h_dialation_shift = (h * DIALATION_PERCENTAGE - h) / 2.0
+
+    self.x = int(x - w_dialation_shift)
+    self.y = int(y - h_dialation_shift)
+    self.w = int(w * DIALATION_PERCENTAGE)
+    self.h = int(h * DIALATION_PERCENTAGE)
     self.eyes = eyes
     self.nose = nose
     self.mouth = mouth
-  
+
   def pose(self):
     cameraMatrix = numpy.eye(3)
     distCoeffs = numpy.zeros((5,1))
     face_points = numpy.array([self.eyes[0].center(), self.eyes[1].center(), self.nose.center(), self.mouth.center()], dtype=float)
     flag, rvec, tvec = cv2.solvePnP(FACE_TRIANGLE, face_points, cameraMatrix, distCoeffs)
     return (flag, rvec, tvec)
-  
+
   def roll(self):
     '''
     Determines roll of face
@@ -78,12 +84,12 @@ class Face:
     if roll < -math.pi/2:
         roll = roll + math.pi
     return roll
-    
+
   def noseLength(self):
     eye_distance = numpy.linalg.norm((self.eyes[0].center()[0], self.eyes[0].center()[1])-(self.eyes[1].center()[0], self.eyes[1].center()[1]))
-    eye_nose_distance = numpy.linalg.norm((self.eyes[0].center()[0], self.eyes[0].center()[1]) - (self.nose.center()[0], self.nose.center()[1])) 
-    
-    
+    eye_nose_distance = numpy.linalg.norm((self.eyes[0].center()[0], self.eyes[0].center()[1]) - (self.nose.center()[0], self.nose.center()[1]))
+
+
   def transform(self):
     '''
     Returns affine transform to correct head pose using roll and yaw
@@ -96,7 +102,7 @@ class Face:
     x22 = self.eyes[1].center()[1]
     x31 = self.nose.center()[0]
     x32 = self.nose.center()[1]
-    
+
     #set up ideal face
     '''
     idealFace = Face(x=self.x, y=self.y, w=self.w, h=self.h)
@@ -121,6 +127,9 @@ class Face:
                 ((x12-x22)*(x11-x31)-(x12-x32)*(x11-x21));
     double a6 = y12-a4*x11-a5*x12;
     '''
+
+    def center(self):
+      return [int(self.x+self.w/2), int(self.y+self.h/2)]
 
 class Eye(FaceFeature):
   """
@@ -168,7 +177,7 @@ def detectFeatures(imageObjectGray):
   FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
   faces = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray, FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
 
-  while len(faces) != 1:
+  while len(faces) < 1:
     print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
     faces = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale(imageObjectGray, FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS, 0, (MINIMUM_FACE_WIDTH, MINIMUM_FACE_HEIGHT))
     if len(faces) < 1:
@@ -180,15 +189,15 @@ def detectFeatures(imageObjectGray):
         if FACE_HAAR_NEIGHBORS < MINIMUM_FACE_HAAR_NEIGHBORS:
             print 'COULDNT FIND A FACE!'
             break
-    elif len(faces) > 1:
-        print 'Too many faces!'
-        FACE_HAAR_SCALE = FACE_HAAR_SCALE * 1.01
-        if FACE_HAAR_SCALE > DEFAULT_FACE_HAAR_SCALE * 1.05:
-            FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS + 1
-            FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
-        else:
-            print 'COULDNT FIND LESS THAN TWO FACES!'
-            break
+    # elif len(faces) > 1:
+    #     print 'Too many faces!'
+    #     FACE_HAAR_SCALE = FACE_HAAR_SCALE * 1.01
+    #     if FACE_HAAR_SCALE > DEFAULT_FACE_HAAR_SCALE * 1.05:
+    #         FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS + 1
+    #         FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
+    #     else:
+    #         print 'COULDNT FIND LESS THAN TWO FACES!'
+    #         break
 
   for x,y,w,h in faces:
 
@@ -207,10 +216,10 @@ def detectFeatures(imageObjectGray):
     MINIMUM_EYE_HEIGHT = int(MINIMUM_EYE_HEIGHT_RATIO * h)
     MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * w)
     MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * h)
-    eye_candidate_region = imageObjectGray[y:y+(h/3*2),x:x+w]
-    nose_candidate_region = imageObjectGray[y:y+h, x:x+w]
-    mouth_candidate_region = imageObjectGray[y+h/3*2:y+h, x:x+w]
-    y_m = y+h/3*2
+    eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+face.w]
+    nose_candidate_region = imageObjectGray[face.y:face.y+face.h, face.x:face.x+face.w]
+    mouth_candidate_region = imageObjectGray[face.y+face.h/3*2:face.y+face.h, face.x:face.x+face.w]
+    y_m = face.y+face.h/3*2
     cv2.namedWindow('face-upper-half', cv2.WINDOW_NORMAL)
     cv2.moveWindow('face-upper-half', 0, 50)
     cv2.imshow('face-upper-half', eye_candidate_region)
@@ -245,26 +254,26 @@ def detectFeatures(imageObjectGray):
     new_eyes = []
     for e_x, e_y, e_w, e_h in eyes:
       #correct coordinate system
-      eye = Eye(e_x+x, e_y+y, e_w, e_h)
+      eye = Eye(e_x+face.x, e_y+face.y, e_w, e_h)
 
       new_eyes.append(eye)
 
     nose = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(nose_candidate_region, 1.05, 1)
     if len(nose) != 0:
         print 'nose detected'
-        nose = Nose(nose[0][0]+x, nose[0][1]+y, nose[0][2], nose[0][3])
+        nose = Nose(nose[0][0]+face.x, nose[0][1]+face.y, nose[0][2], nose[0][3])
         face.nose = nose
     else:
         print 'no nose detected'
-        
+
     mouth = cv2.CascadeClassifier(cascadeMouthPath).detectMultiScale(mouth_candidate_region, 1.05, 1)
     if len(mouth) != 0:
         print 'mouth detected'
-        mouth = Mouth(mouth[0][0]+x, mouth[0][1]+y_m, mouth[0][2], mouth[0][3])
+        mouth = Mouth(mouth[0][0]+face.x, mouth[0][1]+y_m, mouth[0][2], mouth[0][3])
         face.mouth = mouth
     else:
         print 'no mouth detected'
-    
+
     face.eyes = new_eyes
     features.append(face)
 
@@ -290,27 +299,28 @@ def draw_results(image, features, counter):
         print 'width: %s' % imageWidth
         cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
         cv2.moveWindow(windowName, 0, 50)
-        face = features[0]
-        cv2.rectangle(image, (face.x, face.y), (face.x+face.w, face.y+face.h), (255,0,0), 3)
-        print 'rendering %s eyes' % len(face.eyes)
-        for eye in face.eyes:
-            cv2.rectangle(image, (eye.x, eye.y), (eye.x+eye.w, eye.y+eye.h), (0,255,0), 3)
-            cv2.circle(image, (eye.center()[0], eye.center()[1]), 2, (0, 255, 0))
+        for face in features:
+            cv2.rectangle(image, (face.x, face.y), (face.x+face.w, face.y+face.h), (255,0,0), 3)
+            print 'rendering %s eyes' % len(face.eyes)
+            for eye in face.eyes:
+                cv2.rectangle(image, (eye.x, eye.y), (eye.x+eye.w, eye.y+eye.h), (0,255,0), 3)
+                cv2.circle(image, (eye.center()[0], eye.center()[1]), 2, (0, 255, 0))
 
-        if face.nose != None:
-            cv2.rectangle(image, (face.nose.x, face.nose.y), (face.nose.x+ face.nose.w, face.nose.y+face.nose.h), (0, 0, 255), 3)
-            cv2.circle(image, (face.nose.center()[0], face.nose.center()[1]), 2, (0, 0, 255))
-        if face.mouth != None:
-            cv2.rectangle(image, (face.mouth.x, face.mouth.y), (face.mouth.x+ face.mouth.w, face.mouth.y+face.mouth.h), (0, 255, 255), 3)
-            cv2.circle(image, (face.mouth.center()[0], face.mouth.center()[1]), 2, (0, 255, 255))
-        if face.nose != None and face.mouth != None and len(face.eyes) == 2:
-            pose = poseForFace(face)
-            cv2.putText(image, 'roll: %s' % pose[0], (0,15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
-            cv2.putText(image, 'pitch: %s' % pose[1], (0,30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
-            cv2.putText(image, 'yaw: %s' % pose[2], (0,45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
-        
+            if face.nose != None:
+                cv2.rectangle(image, (face.nose.x, face.nose.y), (face.nose.x+ face.nose.w, face.nose.y+face.nose.h), (0, 0, 255), 3)
+                cv2.circle(image, (face.nose.center()[0], face.nose.center()[1]), 2, (0, 0, 255))
+            if face.mouth != None:
+                cv2.rectangle(image, (face.mouth.x, face.mouth.y), (face.mouth.x+ face.mouth.w, face.mouth.y+face.mouth.h), (0, 255, 255), 3)
+                cv2.circle(image, (face.mouth.center()[0], face.mouth.center()[1]), 2, (0, 255, 255))
+            if face.nose != None and face.mouth != None and len(face.eyes) == 2:
+                pose = poseForFace(face)
+                cv2.putText(image, 'roll: %s' % round(pose[0], 2), (face.x,face.y+face.h+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+                cv2.putText(image, 'pitch: %s' % round(pose[1],2), (face.x,face.y+face.h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+                cv2.putText(image, 'yaw: %s' % round(pose[2], 2), (face.x,face.y+face.h+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+
         cv2.resizeWindow(windowName, windowWidth, int(imageWidth / windowWidth * imageHeight))
         cv2.imshow(windowName, image)
+        cv2.imwrite("{0}.jpg".format(windowName), image)
         cv2.waitKey(25)
 
 def poseForFace(face):
@@ -338,7 +348,7 @@ def compile_image_list(path):
 
 def main():
 
-  images = compile_image_list('./../lfw-sm/')
+  images = compile_image_list('./../MultiplePeople/')
 
   for (counter, image) in enumerate(images):
 
@@ -350,6 +360,8 @@ def main():
     features = detectFeatures(imageObjectGray)
 
     #print test.to_JSON()
+
+    print features
 
     draw_results(cv2.imread(image), features, counter)
 
