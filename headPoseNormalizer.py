@@ -31,11 +31,24 @@ FILTER_FACES = True
 
 
 #left eye, right eye, nose
+#LEFT_EYE = [0.0, 0.0, 0.0]
+#RIGHT_EYE = [40.0, 0.0, 0.0]
+#NOSE = [20.0, 27.0, 5.0]
+#MOUTH = [20.0, 49.0, 0.0]
+
 LEFT_EYE = [0.0, 0.0, 0.0]
 RIGHT_EYE = [1.0, 0.0, 0.0]
 NOSE = [0.5, 0.5, 0.25]
-MOUTH = [0.5, 1.25, 0.0]
-FACE_TRIANGLE = numpy.array([LEFT_EYE, RIGHT_EYE, NOSE, MOUTH], dtype=float)
+MOUTH = [0.5, 1.0, 0.0]
+FACE_TRIANGLE = numpy.array([LEFT_EYE, RIGHT_EYE, NOSE, MOUTH], dtype=numpy.float32)
+
+def cameraMatrixForImage(image):
+    cx = image.shape[0]/2
+    cy = image.shape[1]/2
+    fx = cx/math.tan(60/2 * math.pi / 180)
+    fy = fx
+    cameraMatrix = numpy.array([[fx, 0, cx],[0, fy, cy],[0,0,1]], dtype=float)
+    return cameraMatrix
 
 class FaceFeature:
 
@@ -70,10 +83,13 @@ class Face:
     self.nose = nose
     self.mouth = mouth
 
-  def pose(self):
-    cameraMatrix = numpy.eye(3)
+  def pose(self, image):
+    #cameraMatrix = numpy.eye(3)
+    cameraMatrix = cameraMatrixForImage(image)
     distCoeffs = numpy.zeros((5,1))
     face_points = numpy.array([self.eyes[0].center(), self.eyes[1].center(), self.nose.center(), self.mouth.center()], dtype=float)
+    rvec_guess = numpy.zeros((3,1))
+    tvec_guess = numpy.zeros((3,1))
     flag, rvec, tvec = cv2.solvePnP(FACE_TRIANGLE, face_points, cameraMatrix, distCoeffs)
     return (flag, rvec, tvec)
 
@@ -351,24 +367,61 @@ def draw_results(image, features, counter):
                 cv2.rectangle(image, (face.mouth.x, face.mouth.y), (face.mouth.x+ face.mouth.w, face.mouth.y+face.mouth.h), (0, 255, 255), 3)
                 cv2.circle(image, (face.mouth.center()[0], face.mouth.center()[1]), 2, (0, 255, 255))
             if face.nose != None and face.mouth != None and len(face.eyes) == 2:
-                pose = poseForFace(face)
-                cv2.putText(image, 'roll: %s' % round(pose[0], 2), (face.x,face.y+face.h+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+                pose = poseForFace(face, image)
+                cv2.putText(image, 'roll: %s' % round(pose[2], 2), (face.x,face.y+face.h+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
                 cv2.putText(image, 'pitch: %s' % round(pose[1],2), (face.x,face.y+face.h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
-                cv2.putText(image, 'yaw: %s' % round(pose[2], 2), (face.x,face.y+face.h+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+                cv2.putText(image, 'yaw: %s' % round(pose[0], 2), (face.x,face.y+face.h+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
 
         cv2.resizeWindow(windowName, windowWidth, int(imageWidth / windowWidth * imageHeight))
         cv2.imshow(windowName, image)
-        cv2.imwrite("{0}.jpg".format(windowName), image)
-        cv2.waitKey(25)
+        #cv2.imwrite("{0}.jpg".format(windowName), image)
+        while(cv2.waitKey() != 27):
+            continue
 
-def poseForFace(face):
-        flag, rvec, tvec = face.pose()
+def draw_pose(image, features, counter):
+    if len(features) > 0:
+        windowName = 'Image-%s' % counter
+        imageHeight, imageWidth, imageDepth = image.shape
+        windowWidth = 2000
+        print 'width: %s' % imageWidth
+        cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
+        cv2.moveWindow(windowName, 0, 50)
+        for face in features:
+            flag, rvec, tvec = face.pose(image)
+            cameraMatrix = cameraMatrixForImage(image)
+            dist = numpy.zeros((5,1))
+            imgpts, jac = cv2.projectPoints(FACE_TRIANGLE, rvec, tvec, cameraMatrix, dist)
+            print imgpts
+            l_eye = imgpts[0][0]
+            r_eye = imgpts[1][0]
+            nose = imgpts[2][0]
+            mouth = imgpts[3][0]
+            cv2.line(image, (l_eye[0], l_eye[1]), (r_eye[0], r_eye[1]), (0, 0, 255),1)
+            cv2.line(image, (nose[0], nose[1]), (r_eye[0], r_eye[1]), (0, 0, 255),1)
+            cv2.line(image, (nose[0], nose[1]), (l_eye[0], l_eye[1]), (0, 0, 255),1)
+            cv2.line(image, (nose[0], nose[1]), (mouth[0], mouth[1]),(0, 0, 255),1)
+            cv2.circle(image, (face.mouth.center()[0], face.mouth.center()[1]), 2, (0, 255, 0))
+            cv2.circle(image, (face.nose.center()[0], face.nose.center()[1]), 2, (0, 255, 0))
+            cv2.circle(image, (face.eyes[0].center()[0], face.eyes[0].center()[1]), 2, (0, 255, 0))
+            cv2.circle(image, (face.eyes[1].center()[0], face.eyes[1].center()[1]), 2, (0, 255, 0))
+            pose = poseForFace(face, image)
+            cv2.putText(image, 'roll: %s' % round(pose[0], 2), (face.x,face.y+face.h+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+            cv2.putText(image, 'pitch: %s' % round(pose[1],2), (face.x,face.y+face.h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+            cv2.putText(image, 'yaw: %s' % round(pose[2], 2), (face.x,face.y+face.h+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,225,0))
+        cv2.resizeWindow(windowName, windowWidth, int(imageWidth / windowWidth * imageHeight))
+        cv2.imshow(windowName, image)
+        #cv2.imwrite("{0}.jpg".format(windowName), image)
+        while(cv2.waitKey() != 27):
+            continue
+
+def poseForFace(face, image):
+        flag, rvec, tvec = face.pose(image)
         rodrigues = cv2.Rodrigues(rvec)
         #ret, mtxR, mtxQ, qx, qy, qz = cv2.RQDecomp3x3(rodrigues[0])
         R = numpy.array([0,0,0])
         Q = numpy.array([0,0,0])
         eulerAngles = cv2.RQDecomp3x3(rodrigues[0])
-        print eulerAngles
+        #print eulerAngles
         return eulerAngles[0]
 
 def compile_image_list(path):
@@ -386,12 +439,12 @@ def compile_image_list(path):
 
 def main():
 
-  images = compile_image_list('./../MultiplePeople/')
+  images = compile_image_list('./../lfw-sm/')
 
-  for (counter, image) in enumerate(images):
-
+  for (counter, imagename) in enumerate(images):
+    image = cv2.imread(imagename)
     try:
-      imageObjectGray = convertGray(cv2.imread(image))
+      imageObjectGray = convertGray(image)
     except Exception as e:
       print "Couldn't load %s" % imageSource
 
@@ -399,9 +452,9 @@ def main():
 
     #print test.to_JSON()
 
-    print features
+    #print features
 
-    draw_results(cv2.imread(image), features, counter)
+    draw_pose(image, features, counter)
 
   #keep windows open before exiting
   #while cv2.waitKey(1) != 25:
