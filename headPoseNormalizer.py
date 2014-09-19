@@ -15,8 +15,8 @@ cascadeMouthPath = './data/haarcascade_mcs_mouth.xml'
 
 DEFAULT_EYE_HAAR_SCALE = 1.1
 DEFAULT_EYE_HAAR_NEIGHBORS = 3
-DEFAULT_FACE_HAAR_SCALE = 1.01
-DEFAULT_FACE_HAAR_NEIGHBORS = 3
+DEFAULT_FACE_HAAR_SCALE = 1.05
+DEFAULT_FACE_HAAR_NEIGHBORS = 4
 
 MINIMUM_FACE_HAAR_NEIGHBORS = 2
 
@@ -223,7 +223,9 @@ def detectFeatures(imageObjectGray):
     eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+face.w]
     r_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x+face.w-(face.w*EYE_REGION):face.x+face.w]
     l_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+(face.w*EYE_REGION)]
+    # What about calculating nose candidate region based on where the eyes are found?
     nose_candidate_region = imageObjectGray[face.y:face.y+face.h, face.x:face.x+face.w]
+    # Again, the mouth should be below the position found for the nose
     mouth_candidate_region = imageObjectGray[face.y+face.h/3*2:face.y+face.h, face.x:face.x+face.w]
     y_m = face.y+face.h/3*2
     cv2.namedWindow('face-upper-half', cv2.WINDOW_NORMAL)
@@ -281,17 +283,18 @@ def detectFeatures(imageObjectGray):
         if len(l_eye) == 0 or len(r_eye) == 0:
             continue
 
-    eyes = [l_eye.ravel(), r_eye.ravel()]
+    eyes = (l_eye.ravel(), r_eye.ravel())
     print eyes
     print len(eyes)
 
     print '%s eyes detected S:%s N:%s' % (len(eyes), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
     new_eyes = []
-    for e_x, e_y, e_w, e_h in eyes:
-      #correct coordinate system
-      eye = Eye(e_x+face.x, e_y+face.y, e_w, e_h)
+    #correct coordinate system
+    e_x, e_y, e_w, e_h = l_eye.ravel()
+    new_eyes.append(Eye(e_x+face.x, e_y+face.y, e_w, e_h))
 
-      new_eyes.append(eye)
+    e_x, e_y, e_w, e_h = r_eye.ravel()
+    new_eyes.append(Eye(e_x+face.x+face.w-(face.w*EYE_REGION), e_y+face.y, e_w, e_h))
 
     nose = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(nose_candidate_region, 1.05, 1)
     if len(nose) != 0:
