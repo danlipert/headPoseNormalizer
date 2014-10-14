@@ -62,8 +62,8 @@ class Face:
     w_dialation_shift = (w * DIALATION_PERCENTAGE - w) / 2.0
     h_dialation_shift = (h * DIALATION_PERCENTAGE - h) / 2.0
 
-    self.x = int(x - w_dialation_shift)
-    self.y = int(y - h_dialation_shift)
+    self.x = 0 if x-w_dialation_shift < 0 else int(x - w_dialation_shift)
+    self.y = 0 if y-h_dialation_shift < 0 else int(y - h_dialation_shift)
     self.w = int(w * DIALATION_PERCENTAGE)
     self.h = int(h * DIALATION_PERCENTAGE)
     self.eyes = eyes
@@ -206,7 +206,8 @@ def detectFeatures(imageObjectGray):
   for x,y,w,h in faces:
 
     face = Face(x,y,w,h)
-
+    print 'scanning face @(%s, %s) %sx%s' % (x, y, w, h)
+    print 'check face @(%s, %s) %sx%s' % (face.x, face.y, face.w, face.h)
     #scan top half of face bounds
     #there better be two eyes, if not make less sensitive and try smaller scale
     EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
@@ -220,14 +221,23 @@ def detectFeatures(imageObjectGray):
     MINIMUM_EYE_HEIGHT = int(MINIMUM_EYE_HEIGHT_RATIO * face.h)
     MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * face.w)
     MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * face.h)
+    #top two thirds
     eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+face.w]
+    print 'calc check: %s' % (face.x+face.w - face.x)
     r_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x+face.w-(face.w*EYE_REGION):face.x+face.w]
     l_eye_candidate_region = imageObjectGray[face.y:face.y+(face.h/3*2),face.x:face.x+(face.w*EYE_REGION)]
+    
     # What about calculating nose candidate region based on where the eyes are found?
-    nose_candidate_region = imageObjectGray[face.y:face.y+face.h, face.x:face.x+face.w]
+    nose_candidate_region = imageObjectGray[face.y+(face.h/3):face.y+face.h, face.x:face.x+face.w]
+    
     # Again, the mouth should be below the position found for the nose
     mouth_candidate_region = imageObjectGray[face.y+face.h/3*2:face.y+face.h, face.x:face.x+face.w]
+    
     y_m = face.y+face.h/3*2
+    
+    #checks
+    print 'ecm (%sx%s)' % (eye_candidate_region.shape[1], eye_candidate_region.shape[0])
+    
     cv2.namedWindow('face-upper-half', cv2.WINDOW_NORMAL)
     cv2.moveWindow('face-upper-half', 0, 50)
     cv2.imshow('face-upper-half', eye_candidate_region)
@@ -299,7 +309,7 @@ def detectFeatures(imageObjectGray):
     nose = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(nose_candidate_region, 1.05, 1)
     if len(nose) != 0:
         print 'nose detected'
-        nose = Nose(nose[0][0]+face.x, nose[0][1]+face.y, nose[0][2], nose[0][3])
+        nose = Nose(nose[0][0]+face.x, nose[0][1]+face.y+(face.h/3), nose[0][2], nose[0][3])
         face.nose = nose
     else:
         print 'no nose detected'
@@ -386,7 +396,7 @@ def compile_image_list(path):
 
 def main():
 
-  images = compile_image_list('./../MultiplePeople/')
+  images = compile_image_list('./../Downloads/lfw-hyperlayer/')
 
   for (counter, image) in enumerate(images):
 
@@ -394,7 +404,11 @@ def main():
       imageObjectGray = convertGray(cv2.imread(image))
     except Exception as e:
       print "Couldn't load %s" % imageSource
-
+    
+    if imageObjectGray.shape[0] <= 0:
+        continue
+    else:
+        print '%s (%sx%s)' % (image, imageObjectGray.shape[0], imageObjectGray.shape[1])
     features = detectFeatures(imageObjectGray)
 
     #print test.to_JSON()
@@ -404,7 +418,7 @@ def main():
     draw_results(cv2.imread(image), features, counter)
 
   #keep windows open before exiting
-  #while cv2.waitKey(1) != 25:
-    #pass
+  while cv2.waitKey(1) != 25:
+    pass
 
 main()
