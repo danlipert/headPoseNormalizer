@@ -307,13 +307,13 @@ class Face(FaceFeature):
         double a6 = y12-a4*x11-a5*x12;
         '''
 
-def eyesCSI(self):
-    '''
-    Returns comma separated integer string representing eye centers 'left eye x, left eye y, right eye x, right eye y'
-    (Left refers to the location on the image, so left is actually the person's right eye)
-    ex: '100,100,100,200'
-    '''
-    return '%s,%s,%s,%s' % (self.eyes[0].center()[0], self.eyes[0].center()[1], self.eyes[1].center()[0], self.eyes[1].center()[1])
+    def eyesCSI(self):
+        '''
+        Returns comma separated integer string representing eye centers 'left eye x, left eye y, right eye x, right eye y'
+        (Left refers to the location on the image, so left is actually the person's right eye)
+        ex: '100,100,100,200'
+        '''
+        return '%s,%s,%s,%s' % (self.eyes[0].center()[0], self.eyes[0].center()[1], self.eyes[1].center()[0], self.eyes[1].center()[1])
 
 
 class Eye(FaceFeature):
