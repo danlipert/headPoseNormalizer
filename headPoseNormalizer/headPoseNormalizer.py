@@ -2,15 +2,32 @@ import cv2
 import json
 import numpy
 import math
+import os
+import sys
 
 
 # --------------- CONSTANTS -----------------
 
+local_dir = os.path.dirname(__file__)
+
+
 # haar cascades
-cascadeEyePath = './data/haarcascade_eye.xml'
-cascadeFacePath = './data/haarcascade_frontalface_default.xml'
-cascadeNosePath = './data/haarcascade_mcs_nose.xml'
-cascadeMouthPath = './data/haarcascade_mcs_mouth.xml'
+cascadeEyePath = '%s%s' % (local_dir, '/data/haarcascade_eye.xml')
+
+cascadeFacePath = '%s%s' % (local_dir, '/data/haarcascade_frontalface_default.xml')
+
+cascadeNosePath = '%s%s' % (local_dir, '/data/haarcascade_mcs_nose.xml')
+
+cascadeMouthPath = '%s%s' % (local_dir, '/data/haarcascade_mcs_mouth.xml')
+
+#check cascade paths
+print 'checking cascade files...'
+print 'file: %s' % os.path.dirname(__file__)
+print 'local dir: %s' % local_dir
+print '%s -> %s' % (cascadeFacePath, os.path.isfile(cascadeFacePath))
+print '%s -> %s' % (cascadeEyePath, os.path.isfile(cascadeEyePath))
+print '%s -> %s' % (cascadeNosePath, os.path.isfile(cascadeNosePath))
+print '%s -> %s' % (cascadeMouthPath, os.path.isfile(cascadeMouthPath))
 
 # haar defaults
 DEFAULT_EYE_HAAR_SCALE = 1.1
@@ -82,7 +99,11 @@ class Face(FaceFeature):
         h_dialation_shift = (h * DIALATION_PERCENTAGE - h) / 2.0
 
         self.x = int(x - w_dialation_shift)
+        if self.x < 0:
+            self.x = 0
         self.y = int(y - h_dialation_shift)
+        if self.y < 0:
+            self.y = 0
         self.w = int(w * DIALATION_PERCENTAGE)
         self.h = int(h * DIALATION_PERCENTAGE)
         self.eyes = eyes
@@ -92,6 +113,12 @@ class Face(FaceFeature):
     @classmethod
     def fromImage(self, origin_x, origin_y, facewidth, faceheight, imageObjectGray):
         # basic container of face box attributes
+
+        if origin_x < 0:
+            origin_x = 0
+        if origin_y < 0:
+            origin_y = 0
+
         face = Face(origin_x, origin_y, facewidth, faceheight)
 
         mouth_yoffset = face.y + face.h / 3 * 2
@@ -119,7 +146,6 @@ class Face(FaceFeature):
         #cv2.imshow('face-upper-half', eye_candidate_region)
         #cv2.waitKey(25)
 
-        # get eyes
         l_eye = Face.findEye(facewidth, faceheight, l_eye_candidate_region, eyename="LEFT")
         r_eye = Face.findEye(facewidth, faceheight, r_eye_candidate_region, eyename="RIGHT")
 
@@ -128,8 +154,6 @@ class Face(FaceFeature):
                 return None  # missing an eye, so we don't want this face
 
         eyes = (l_eye.ravel(), r_eye.ravel())
-        print eyes
-        print len(eyes)
 
         new_eyes = []
         #correct coordinate system
@@ -355,7 +379,9 @@ class FaceImage(object):
         """
         Loads image and converts it to grayscale.
         """
-        return cv2.cvtColor(imageObject,cv2.COLOR_BGR2GRAY)
+        gray_image = cv2.cvtColor(imageObject, cv2.COLOR_BGR2GRAY)
+        print 'converted gray image: %s' % gray_image
+        return gray_image
 
     def detectFeatures(self):
         """
@@ -365,9 +391,10 @@ class FaceImage(object):
 
         FACE_HAAR_NEIGHBORS = DEFAULT_FACE_HAAR_NEIGHBORS
         FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
+        cascade = cv2.CascadeClassifier(cascadeFacePath)
 
-        face_classifier = cv2.CascadeClassifier(cascadeFacePath).detectMultiScale
-
+        face_classifier = cascade.detectMultiScale
+ 
         faces = face_classifier(self.image_gray,
                                 FACE_HAAR_SCALE,
                                 FACE_HAAR_NEIGHBORS)
@@ -379,14 +406,12 @@ class FaceImage(object):
                 print 'Need more faces!'
                 FACE_HAAR_SCALE = FACE_HAAR_SCALE * 0.99
 
-                if FACE_HAAR_SCALE < DEFAULT_FACE_HAAR_SCALE * 0.9:
+                if FACE_HAAR_SCALE < DEFAULT_FACE_HAAR_SCALE * 0.9 or FACE_HAAR_SCALE < 1.0:
                     FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS - 1
                     FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
-
                 if FACE_HAAR_NEIGHBORS < MINIMUM_FACE_HAAR_NEIGHBORS:
                     print 'COULDNT FIND A FACE!'
                     break
-
             faces = face_classifier(self.image_gray,
                                     FACE_HAAR_SCALE,
                                     FACE_HAAR_NEIGHBORS,
@@ -404,6 +429,10 @@ class FaceImage(object):
             #         break
 
         for x, y, w, h in faces:
+            if x < 0:
+                x = 0
+            if y < 0:
+                y = 0
             face = Face.fromImage(x, y, w, h, self.image_gray)
 
             if face:
