@@ -368,11 +368,16 @@ class Nose(FaceFeature):
 
 
 class FaceImage(object):
-    def __init__(self, image):
-        self.image_path = image
-        self.image = cv2.imread(image)
-        self.image_gray = self.convertGray(self.image)
-        self.faces = None
+    def __init__(self, image=None, image_object=None):
+        if image != None:
+            self.image_path = image
+            self.image = cv2.imread(image)
+            self.image_gray = self.convertGray(self.image)
+            self.faces = None
+        else:
+            self.image = image_object
+            self.image_gray = self.convertGray(self.image)
+            self.faces = None
 
     @staticmethod
     def convertGray(imageObject):
