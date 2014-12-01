@@ -173,25 +173,27 @@ class Face(FaceFeature):
         nose = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(nose_candidate_region, 1.05, 1)
 
         if len(nose) != 0:
-            print 'nose detected'
+            #print 'nose detected'
             nose = Nose(nose[0][0] + face.x,
                         nose[0][1] + face.y,
                         nose[0][2],
                         nose[0][3])
         else:
-            print 'no nose detected'
+            #print 'no nose detected'
+            pass
 
         # find mouth
         mouth = cv2.CascadeClassifier(cascadeMouthPath).detectMultiScale(mouth_candidate_region, 1.05, 1)
 
         if len(mouth) != 0:
-            print 'mouth detected'
+            #print 'mouth detected'
             mouth = Mouth(mouth[0][0] + face.x,
                           mouth[0][1] + mouth_yoffset,
                           mouth[0][2],
                           mouth[0][3])
         else:
-            print 'no mouth detected'
+            #print 'no mouth detected'
+            pass
 
         return Face(origin_x, origin_y, facewidth, faceheight, eyes=new_eyes, nose=nose, mouth=mouth)
 
@@ -218,7 +220,7 @@ class Face(FaceFeature):
                                (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
 
         while len(eye) != 1:
-            print '%s eyes detected S:%s N:%s' % (len(eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+            #print '%s eyes detected S:%s N:%s' % (len(eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
 
             if len(eye) < 1:
                 EYE_HAAR_SCALE = EYE_HAAR_SCALE * 0.99
@@ -228,7 +230,7 @@ class Face(FaceFeature):
                     EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS - 1
 
                 if EYE_HAAR_NEIGHBORS == 0:
-                    print 'COULDNT FIND {0} EYE!'.format(eyename)
+                    #print 'COULDNT FIND {0} EYE!'.format(eyename)
                     break
 
                 eye = eye_classifier(candidate_region,
@@ -246,7 +248,7 @@ class Face(FaceFeature):
                     EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS + 1
 
                 if EYE_HAAR_NEIGHBORS >= DEFAULT_EYE_HAAR_NEIGHBORS + 2:
-                    print 'COULDNT FIND LESS THAN 2 {0} EYES?!'.format(eyename)
+                    #print 'COULDNT FIND LESS THAN 2 {0} EYES?!'.format(eyename)
                     break
 
                 # is there a specific reason this does not take the min and max
@@ -255,7 +257,7 @@ class Face(FaceFeature):
                                      EYE_HAAR_SCALE,
                                      EYE_HAAR_NEIGHBORS)
 
-        print '%s EYE DETECTED S:%s N:%s' % (eyename, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        #print '%s EYE DETECTED S:%s N:%s' % (eyename, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
 
         return eye
 
@@ -273,7 +275,7 @@ class Face(FaceFeature):
         R = numpy.array([0,0,0])
         Q = numpy.array([0,0,0])
         eulerAngles = cv2.RQDecomp3x3(rodrigues[0])
-        print eulerAngles
+        #print eulerAngles
         return eulerAngles[0]
 
     def roll(self):
@@ -385,7 +387,7 @@ class FaceImage(object):
         Loads image and converts it to grayscale.
         """
         gray_image = cv2.cvtColor(imageObject, cv2.COLOR_BGR2GRAY)
-        print 'converted gray image: %s' % gray_image
+        #print 'converted gray image: %s' % gray_image
         return gray_image
 
     def detectFeatures(self):
@@ -405,17 +407,17 @@ class FaceImage(object):
                                 FACE_HAAR_NEIGHBORS)
 
         while len(faces) < 1:
-            print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
+            #print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
 
             if len(faces) < 1:
-                print 'Need more faces!'
+                #print 'Need more faces!'
                 FACE_HAAR_SCALE = FACE_HAAR_SCALE * 0.99
 
                 if FACE_HAAR_SCALE < DEFAULT_FACE_HAAR_SCALE * 0.9 or FACE_HAAR_SCALE < 1.0:
                     FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS - 1
                     FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
                 if FACE_HAAR_NEIGHBORS < MINIMUM_FACE_HAAR_NEIGHBORS:
-                    print 'COULDNT FIND A FACE!'
+                    #print 'COULDNT FIND A FACE!'
                     break
             faces = face_classifier(self.image_gray,
                                     FACE_HAAR_SCALE,
@@ -424,13 +426,13 @@ class FaceImage(object):
                                     (MINIMUM_FACE_WIDTH, MINIMUM_FACE_HEIGHT))
 
             # elif len(faces) > 1:
-            #     print 'Too many faces!'
+            #     #print 'Too many faces!'
             #     FACE_HAAR_SCALE = FACE_HAAR_SCALE * 1.01
             #     if FACE_HAAR_SCALE > DEFAULT_FACE_HAAR_SCALE * 1.05:
             #         FACE_HAAR_NEIGHBORS = FACE_HAAR_NEIGHBORS + 1
             #         FACE_HAAR_SCALE = DEFAULT_FACE_HAAR_SCALE
             #     else:
-            #         print 'COULDNT FIND LESS THAN TWO FACES!'
+            #         #print 'COULDNT FIND LESS THAN TWO FACES!'
             #         break
 
         for x, y, w, h in faces:
@@ -453,12 +455,12 @@ class FaceImage(object):
             windowName = 'Image-%s' % counter
             imageHeight, imageWidth, imageDepth = image.shape
             windowWidth = 2000
-            print 'width: %s' % imageWidth
+            #print 'width: %s' % imageWidth
             cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
             cv2.moveWindow(windowName, 0, 50)
             for face in features:
                 cv2.rectangle(image, (face.x, face.y), (face.x + face.w, face.y + face.h), (255,0,0), 3)
-                print 'rendering %s eyes' % len(face.eyes)
+                #print 'rendering %s eyes' % len(face.eyes)
                 for eye in face.eyes:
                     cv2.rectangle(image, (eye.x, eye.y), (eye.x+eye.w, eye.y+eye.h), (0,255,0), 3)
                     cv2.circle(image, (eye.center()[0], eye.center()[1]), 2, (0, 255, 0))
