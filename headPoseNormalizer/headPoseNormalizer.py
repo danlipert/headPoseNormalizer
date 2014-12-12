@@ -21,13 +21,14 @@ cascadeNosePath = '%s%s' % (local_dir, '/data/haarcascade_mcs_nose.xml')
 cascadeMouthPath = '%s%s' % (local_dir, '/data/haarcascade_mcs_mouth.xml')
 
 #check cascade paths
-print 'checking cascade files...'
-print 'file: %s' % os.path.dirname(__file__)
-print 'local dir: %s' % local_dir
-print '%s -> %s' % (cascadeFacePath, os.path.isfile(cascadeFacePath))
-print '%s -> %s' % (cascadeEyePath, os.path.isfile(cascadeEyePath))
-print '%s -> %s' % (cascadeNosePath, os.path.isfile(cascadeNosePath))
-print '%s -> %s' % (cascadeMouthPath, os.path.isfile(cascadeMouthPath))
+def check_cascades():
+    print 'checking cascade files...'
+    print 'file: %s' % os.path.dirname(__file__)
+    print 'local dir: %s' % local_dir
+    print '%s -> %s' % (cascadeFacePath, os.path.isfile(cascadeFacePath))
+    print '%s -> %s' % (cascadeEyePath, os.path.isfile(cascadeEyePath))
+    print '%s -> %s' % (cascadeNosePath, os.path.isfile(cascadeNosePath))
+    print '%s -> %s' % (cascadeMouthPath, os.path.isfile(cascadeMouthPath))
 
 # haar defaults
 DEFAULT_EYE_HAAR_SCALE = 1.1
@@ -110,19 +111,30 @@ class Face(FaceFeature):
         self.nose = nose
         self.mouth = mouth
 
+    '''
+    @classmethod
+    def fromImage(self, origin_x, origin_y, facewidth, faceheight, imageObjectGray):
+        print 'received fromImage call -> (%s, %s, %s, %s) @ %s' % (origin_x, origin_y, facewidth, faceheight, imageObjectGray)
+        return 1
+    '''
+
     @classmethod
     def fromImage(self, origin_x, origin_y, facewidth, faceheight, imageObjectGray):
         # basic container of face box attributes
+        print 'received fromImage call -> (%s, %s, %s, %s) @ %s' % (origin_x, origin_y, facewidth, faceheight, imageObjectGray)
+
 
         if origin_x < 0:
             origin_x = 0
         if origin_y < 0:
             origin_y = 0
-
+        
+        print 'creating face object'
         face = Face(origin_x, origin_y, facewidth, faceheight)
 
         mouth_yoffset = face.y + face.h / 3 * 2
-
+        
+        print 'cropping eyes'
         eye_candidate_region = imageObjectGray[face.y:mouth_yoffset,
                                                face.x:face.x + face.w]
 
@@ -131,11 +143,11 @@ class Face(FaceFeature):
 
         l_eye_candidate_region = imageObjectGray[face.y:mouth_yoffset,
                                                  face.x:face.x + (face.w * EYE_REGION)]
-
+        print 'cropping nose'
         # what about calculating nose candidate region based on where the eyes are found?
         nose_candidate_region = imageObjectGray[face.y:face.y + face.h,
                                                 face.x:face.x + face.w]
-
+        print 'cropping mouth'
         # again, the mouth should be below the position found for the nose
         mouth_candidate_region = imageObjectGray[mouth_yoffset:face.y + face.h,
                                                  face.x:face.x + face.w]
@@ -145,14 +157,16 @@ class Face(FaceFeature):
         #cv2.moveWindow('face-upper-half', 0, 50)
         #cv2.imshow('face-upper-half', eye_candidate_region)
         #cv2.waitKey(25)
-
+        
+        print 'finding eyes'
         l_eye = Face.findEye(facewidth, faceheight, l_eye_candidate_region, eyename="LEFT")
         r_eye = Face.findEye(facewidth, faceheight, r_eye_candidate_region, eyename="RIGHT")
 
         if FILTER_FACES:
             if len(l_eye) == 0 or len(r_eye) == 0:
+                print 'one or more eyes missing: %s, %s' % (l_eye, r_eye)
                 return None  # missing an eye, so we don't want this face
-
+        print 'ravelling eyes'
         eyes = (l_eye.ravel(), r_eye.ravel())
 
         new_eyes = []
@@ -168,37 +182,40 @@ class Face(FaceFeature):
                             e_y + face.y,
                             e_w,
                             e_h))
-
+        print 'finding nose'
         # find nose
         nose = cv2.CascadeClassifier(cascadeNosePath).detectMultiScale(nose_candidate_region, 1.05, 1)
 
         if len(nose) != 0:
-            #print 'nose detected'
+            print 'nose detected'
             nose = Nose(nose[0][0] + face.x,
                         nose[0][1] + face.y,
                         nose[0][2],
                         nose[0][3])
         else:
-            #print 'no nose detected'
+            print 'no nose detected'
             pass
 
         # find mouth
         mouth = cv2.CascadeClassifier(cascadeMouthPath).detectMultiScale(mouth_candidate_region, 1.05, 1)
 
         if len(mouth) != 0:
-            #print 'mouth detected'
+            print 'mouth detected'
             mouth = Mouth(mouth[0][0] + face.x,
                           mouth[0][1] + mouth_yoffset,
                           mouth[0][2],
                           mouth[0][3])
         else:
-            #print 'no mouth detected'
+            print 'no mouth detected'
             pass
 
         return Face(origin_x, origin_y, facewidth, faceheight, eyes=new_eyes, nose=nose, mouth=mouth)
 
     @staticmethod
     def findEye(facewidth, faceheight, candidate_region, eyename=""):
+        width, height = candidate_region.shape
+        print 'finding eye @ candidate region size (%s, %s)' % (width, height)
+        check_cascades()
         # scan top half of face bounds
         # there better be two eyes, if not make less sensitive and try smaller scale
         EYE_HAAR_SCALE = DEFAULT_EYE_HAAR_SCALE
@@ -207,11 +224,14 @@ class Face(FaceFeature):
         # calc bounds for eye width and height
         MINIMUM_EYE_WIDTH = int(MINIMUM_EYE_WIDTH_RATIO * facewidth)
         MINIMUM_EYE_HEIGHT = int(MINIMUM_EYE_HEIGHT_RATIO * faceheight)
-        MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * facewidth)
-        MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * faceheight)
+        #MAXIMUM_EYE_WIDTH = int(MAXIMUM_EYE_WIDTH_RATIO * facewidth)
+        #MAXIMUM_EYE_HEIGHT = int(MAXIMUM_EYE_HEIGHT_RATIO * faceheight)
+        MAXIMUM_EYE_WIDTH = width
+        MAXIMUM_EYE_HEIGHT = height
+        print 'eye min/max: (%s, %s) / (%s, %s)' % (MINIMUM_EYE_WIDTH, MINIMUM_EYE_HEIGHT, MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT)
 
         eye_classifier = cv2.CascadeClassifier(cascadeEyePath).detectMultiScale
-
+        print 'eye classifier loaded: %s' % eye_classifier
         eye = eye_classifier(candidate_region,
                                EYE_HAAR_SCALE,
                                EYE_HAAR_NEIGHBORS,
@@ -220,7 +240,7 @@ class Face(FaceFeature):
                                (MAXIMUM_EYE_WIDTH, MAXIMUM_EYE_HEIGHT))
 
         while len(eye) != 1:
-            #print '%s eyes detected S:%s N:%s' % (len(eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+            print '%s eyes detected S:%s N:%s' % (len(eye), EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
 
             if len(eye) < 1:
                 EYE_HAAR_SCALE = EYE_HAAR_SCALE * 0.99
@@ -230,7 +250,7 @@ class Face(FaceFeature):
                     EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS - 1
 
                 if EYE_HAAR_NEIGHBORS == 0:
-                    #print 'COULDNT FIND {0} EYE!'.format(eyename)
+                    print 'COULDNT FIND {0} EYE!'.format(eyename)
                     break
 
                 eye = eye_classifier(candidate_region,
@@ -248,7 +268,7 @@ class Face(FaceFeature):
                     EYE_HAAR_NEIGHBORS = EYE_HAAR_NEIGHBORS + 1
 
                 if EYE_HAAR_NEIGHBORS >= DEFAULT_EYE_HAAR_NEIGHBORS + 2:
-                    #print 'COULDNT FIND LESS THAN 2 {0} EYES?!'.format(eyename)
+                    print 'COULDNT FIND LESS THAN 2 {0} EYES?!'.format(eyename)
                     break
 
                 # is there a specific reason this does not take the min and max
@@ -257,7 +277,7 @@ class Face(FaceFeature):
                                      EYE_HAAR_SCALE,
                                      EYE_HAAR_NEIGHBORS)
 
-        #print '%s EYE DETECTED S:%s N:%s' % (eyename, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
+        print '%s EYE DETECTED S:%s N:%s' % (eyename, EYE_HAAR_SCALE, EYE_HAAR_NEIGHBORS)
 
         return eye
 
@@ -370,7 +390,7 @@ class Nose(FaceFeature):
 
 
 class FaceImage(object):
-    def __init__(self, image=None, image_object=None):
+    def __init__(self, image=None, image_object=None, pre_cropped=False):
         if image != None:
             self.image_path = image
             self.image = cv2.imread(image)
@@ -380,6 +400,8 @@ class FaceImage(object):
             self.image = image_object
             self.image_gray = self.convertGray(self.image)
             self.faces = None
+        if pre_cropped:
+            self.faces = [Face.fromImage(0,0,self.image_gray.shape[1], self.image_gray.shape[0], self.image_gray)]
 
     @staticmethod
     def convertGray(imageObject):
@@ -401,13 +423,13 @@ class FaceImage(object):
         cascade = cv2.CascadeClassifier(cascadeFacePath)
 
         face_classifier = cascade.detectMultiScale
- 
+        print 'detecting faces...'
         faces = face_classifier(self.image_gray,
                                 FACE_HAAR_SCALE,
                                 FACE_HAAR_NEIGHBORS)
-
+        print 'first pass %s faces' % len(faces)
         while len(faces) < 1:
-            #print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
+            print '%s faces detected S:%s N:%s' % (len(faces), FACE_HAAR_SCALE, FACE_HAAR_NEIGHBORS)
 
             if len(faces) < 1:
                 #print 'Need more faces!'
@@ -434,17 +456,21 @@ class FaceImage(object):
             #     else:
             #         #print 'COULDNT FIND LESS THAN TWO FACES!'
             #         break
-
+        print '%s face successfully found' % len(faces)
         for x, y, w, h in faces:
             if x < 0:
                 x = 0
             if y < 0:
                 y = 0
+            print 'assembling face object'
+            print 'self.image_gray -> %s' % self.image_gray
+            print 'face at (%s, %s, %s, %s)' % (x, y, w, h)
             face = Face.fromImage(x, y, w, h, self.image_gray)
-
+            print 'assembled face: %s - did you see the face attempt assembly?' % face
             if face:
+                print 'appending faces'
                 self.faces.append(face)
-
+        print 'HPN returning %s faces' % len(self.faces)
         return self.faces
 
     def drawResults(self, counter=0):
